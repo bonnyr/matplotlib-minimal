@@ -1,5 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import os,sys
 from datetime import datetime
 from dateutil import parser
@@ -102,7 +103,7 @@ def trimState(counterMaps, count):
             
 
 def processSnapshot(counterMaps, snapshotFile):
-    m  = re.match('(.*/)?(?P<device>[^-]+)-(?P<date>.*)-(?P<time>.*)\..*$', snapshotFile)
+    m  = re.match('(.*/)?(?P<device>[^-]+)-((?P<date>.*)(-(?P<time>.*))?)\..*$', snapshotFile)
     if not m:
         errExit('snapshotFile must be formatted using <device>-<date>')
 
@@ -146,12 +147,16 @@ def plotCounter(counterMaps, counter, outdir):
     v6Counter = mapV6[counter]
     cm6 = counterMaps[v6Counter]
 
-    fig, axis = plt.subplots(2, sharex=True)
+    fig, axis = plt.subplots(2)
     fig.set_size_inches(20,10)
-    plt.xticks(rotation=45, ha='right')
+    fig.tight_layout(pad=8)
+    plt.subplots_adjust(right=0.7, left=0.05)
+
+    colmap = plt.get_cmap('gist_rainbow')
 
     def plotFigure(name, m, row):
-        axis[row].set_title(name)
+        axis[row].set_title('%s - generated at %s' % (name, datetime.now().strftime('%Y%m%d-%H%M')))
+        colNdx=0
         for h in m:
             ds = m[h]
             sds = dict(sorted(ds.items()))
@@ -160,9 +165,12 @@ def plotCounter(counterMaps, counter, outdir):
             dvl = [0] +[ v[i+1] - v[i] for i in range(len(v)-1)]
             kl = list(sds.keys())
             # print( 'plotting %s: %s' %(name, dvl))
-            axis[row].plot(kl, dvl, 'o-', label=h)
+            axis[row].tick_params(axis='x', rotation=45)
+            axis[row].plot(kl, dvl, 'o-', label=h, color=colmap(1.*colNdx/len(m)))
+            colNdx += 1
 
-        axis[row].legend()
+        if row == 0:
+            axis[row].legend(bbox_to_anchor=(1.04, 1), loc="upper left")#, ncol=int(len(m)/30)+1)
 
     plotFigure(counter, cm, 0)
     plotFigure(v6Counter, cm6, 1)
@@ -237,7 +245,7 @@ def run():
 
     # add new samples if present
     for sf in inFiles: #args.snapshots:
-        print('processing snapshot %s' %sf, file=sys.stderr)
+        # print('processing snapshot %s' %sf, file=sys.stderr)
         processSnapshot(counterMaps, sf)
 
     # trim if required
