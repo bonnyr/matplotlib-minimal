@@ -102,13 +102,14 @@ def trimState(counterMaps, count):
             
 
 def processSnapshot(counterMaps, snapshotFile):
-    m  = re.match('(?P<device>[^-]+)-(?P<date>.*)-(?P<time>.*)\..*$', snapshotFile)
+    m  = re.match('(.*/)?(?P<device>[^-]+)-(?P<date>.*)-(?P<time>.*)\..*$', snapshotFile)
     if not m:
         errExit('snapshotFile must be formatted using <device>-<date>')
 
     device = m.group('device')
     date = m.group('date')
 
+    print('processing sample snapshot for %s in %s' % (device, snapshotFile))
     # device = ''
     # date = ''
     statCnt = 0
