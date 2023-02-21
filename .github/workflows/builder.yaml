@@ -12,14 +12,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
       
-      - shell: bash
-        env:
-          DU: ${{ secrets.DOCKER_USERNAME }}
-          DP: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-         echo ${DU}
-         echo ${DP}
-         
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
