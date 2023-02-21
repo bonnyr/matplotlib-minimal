@@ -16,7 +16,7 @@ jobs:
         env:
           DU: ${{ secrets.DOCKER_USERNAME }}
         shell: bash
-        run: echo "--->${{ secrets.DOCKER_USERNAME }} --- ${{DU}} ==="
+        run: echo "--->${{ secrets.DOCKER_USERNAME }} --- $DU ==="
         
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
