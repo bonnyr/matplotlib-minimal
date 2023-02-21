@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["-t", "10", "-m", "sysIpStatNbrUnreachableDropped","pod.csv", "dev0-230217-2000.txt", "dev0-230217-2001.txt", "dev0-230217-2002.txt", "dev0-230217-2003.txt", "dev0-230217-2004.txt", "dev0-230217-2005.txt", "dev0-230217-2006.txt", "dev0-230217-2007.txt", "dev0-230217-2008.txt", "dev0-230217-2009.txt", "dev0-230217-2010.txt", "dev0-230217-2011.txt", "dev0-230217-2012.txt", "dev0-230217-2013.txt", "dev0-230217-2014.txt", "dev0-230217-2015.txt", "dev0-230217-2016.txt", "dev0-230217-2017.txt", "dev0-230217-2018.txt", "dev0-230217-2019.txt", "dev0-230217-2020.txt", "dev0-230217-2021.txt", "dev0-230217-2022.txt", "dev0-230217-2023.txt", "dev0-230217-2024.txt", "dev0-230217-2025.txt", "dev0-230217-2026.txt", "dev0-230217-2027.txt", "dev0-230217-2028.txt", "dev0-230217-2029.txt", "dev0-230217-2030.txt", "dev1-230217-2000.txt", "dev1-230217-2001.txt", "dev1-230217-2002.txt", "dev1-230217-2003.txt"]
+        },
+        {
+            "name": "Python: Current File (intput/output)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["pod.csv", "/data/Input/SN POD1", "/data/Output/SN POD1"]
+        }
+
+    ]
+}
+
