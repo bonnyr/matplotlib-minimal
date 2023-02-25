@@ -2,6 +2,7 @@
   "image": "bonnyr/matplotlib-minimal:latest",
   "remoteUser": "root",
   "mounts": [
-    "source=C:\\Users\\bonny\\OneDrive - F5 Networks\\99. Other\\20. Packet Loss Investigation,target=/data,type=bind,consistency=cached"
+    "source=C:\\Users\\bonny\\OneDrive - F5 Networks\\99. Other\\20. Packet Loss Investigation,target=/data,type=bind,consistency=cached",
+    "source=C:\\Temp,target=/cdata,type=bind,consistency=cached"
   ]
 }

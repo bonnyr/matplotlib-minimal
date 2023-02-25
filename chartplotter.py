@@ -200,6 +200,7 @@ def plotCounter(counterMaps, counter, outdir):
             # print( 'plotting %s: %s' %(name, dvl))
             axis[row].tick_params(axis='x', rotation=45)
             axis[row].plot(kl, dvl, 'o-', label=h, color=colors[colNdx % 50])
+            axis[row].text(kl[-1], dvl[-1], h[len(h)-2:], bbox=dict(boxstyle="square,pad=0.3", fc="lightblue"))
             colNdx += 1
 
         if row == 0:
