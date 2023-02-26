@@ -190,7 +190,9 @@ def plotCounter(counterMaps, counter, outdir):
         axis[row].set_title('%s - generated at %s' %
                             (name, datetime.now().strftime('%Y%m%d-%H%M')))
         colNdx = 0
-        for h in m:
+
+        hs = sorted(m.keys())
+        for h in hs:
             ds = m[h]
             sds = dict(sorted(ds.items()))
 
