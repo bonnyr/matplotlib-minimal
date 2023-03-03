@@ -15,7 +15,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["pod.csv", "/data/Input/SN POD1", "/data/Output/SN POD1"]
+            "args": ["pod.csv", "/data/Input/SN POD1", "/data/Output/SN POD1", "-m", "sysIpStatMcastRx"]
         }
 
     ]
