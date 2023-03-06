@@ -43,6 +43,16 @@ mapV6 = {
     'sysIpStatErrMcastMaxPendingRoutes': 'sysIp6StatErrMcastMaxPendingRoutes',
 }
 
+mapRatioStats = {
+    'sysIp6StatDropped': 'sysIp6StatRx',
+    'sysIp6StatNbrPbqFullDropped': 'sysIp6StatRx',
+    'sysIp6StatNbrUnreachableDropped': 'sysIp6StatRx',
+
+    'sysIpStatDropped': 'sysIpStatRx',
+    'sysIpStatNbrPbqFullDropped': 'sysIpStatRx',
+    'sysIpStatNbrUnreachableDropped': 'sysIpStatRx',
+}
+
 EXPECTED_STAT_CNT = 52
 
 
@@ -177,118 +187,139 @@ def processSnapshot(counterMaps, snapshotFile):
             errExit('too few counters when processing file %s' % snapshotFile)
 
 
+def plotStats(name, m4, m6, tm, tm6, fig, ax):
+    nrows = len(m4.keys())
+
+    ax.set_xlim(0, 7.5)
+    ax.set_ylim(0, nrows + 1)
+
+    positions = [0, 1, 3.5, 5.5, 7.5]
+    columns = ['-0-', 'Host', 'IPv4', 'IPv6']
+
+    # check if totals map is provided. Note assuming that if v4 is present, so will v6...
+    if tm:
+        ax.set_xlim(0, 10.5)
+        positions = [0, 1, 4.5, 6.5, 7.5, 9.5, 10.5]
+        columns = ['-0-', 'Host', 'IPv4', '%', 'IPv6', '%']
+
+    colNdx = 0
+
+    def getDiffFromMap(m, h):
+        ds = m[h]
+        sds = dict(sorted(ds.items()))
+
+        v = list(sds.values())
+
+        return v[len(v)-1] - v[len(v)-2]
+
+
+
+    hs = sorted(m4.keys())
+    for h in hs:
+        d4 = getDiffFromMap(m4, h)
+        d6 = getDiffFromMap(m6, h)
+        td = None
+        td6 = None
+        if tm:
+            td = getDiffFromMap(tm, h)
+            td6 = getDiffFromMap(tm6, h)
+
+
+        # plot shape
+        # -- Transformation functions
+        DC_to_FC = ax.transData.transform
+        FC_to_NFC = fig.transFigure.inverted().transform
+        # -- Take data coordinates and transform them to normalized figure coordinates
+        DC_to_NFC = lambda x: FC_to_NFC(DC_to_FC(x))
+        # -- Add figure axes
+        ax_point_1 = DC_to_NFC([2.25, 0.25])
+        ax_point_2 = DC_to_NFC([2.75, 0.75])
+        ax_width = abs(ax_point_1[0] - ax_point_2[0])
+        ax_height = abs(ax_point_1[1] - ax_point_2[1])
+        ax_coords = DC_to_NFC([0, nrows - colNdx - .75])
+        plot_ax = fig.add_axes(
+            [ax_coords[0], ax_coords[1], ax_width, ax_height]
+        )
+        plot_ax.plot([1],[1],'o-', color=colors[colNdx % 50])
+        plot_ax.set_axis_off()
+
+
+        if not tm:
+            ax.annotate(xy=(positions[1], nrows - colNdx - 0.5), s=h, ha='left', va='center')
+            ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s=str(d4), ha='right', va='center')
+            ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s=str(d6), ha='right', va='center')
+        else:
+            ax.annotate(xy=(positions[1], nrows - colNdx - 0.5), s=h, ha='left', va='center')
+            ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s=str(d4), ha='right', va='center')
+            ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s='%2.2f' % (d4 / td), ha='right', va='center')
+            ax.annotate(xy=(positions[5]- 0.05, nrows - colNdx - 0.5), s=str(d6), ha='right', va='center')
+            ax.annotate(xy=(positions[6]- 0.05, nrows - colNdx - 0.5), s='%2.2f' % (d6 / td6), ha='right', va='center')
+
+
+        colNdx += 1
+
+    # -- Add column names
+    for index, c in enumerate(columns):
+            ax.annotate( xy=(positions[index], nrows + .05), s=columns[index], ha='left', va='bottom', weight='bold' )
+
+    # Add dividing lines
+    ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [nrows, nrows], lw=1.5, color='black', marker='', zorder=4)
+    ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [0, 0], lw=1.5, color='black', marker='', zorder=4)
+    for pos in range (1, len(positions), 2):
+        ax.fill_between( x=[positions[pos],positions[pos+1]], y1=nrows, y2=0, color='lightgrey', alpha=0.5, zorder=-1, ec='None' )            
+    for x in range(1, nrows):
+        ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [x, x], lw=1.15, color='gray', ls=':', zorder=3 , marker='')
+
+    for x in range(0, len(positions)):
+        ax.plot([positions[x],positions[x]], [ax.get_ylim()[0], ax.get_ylim()[1]-1], lw=1.15, color='gray', zorder=3 , marker='')
+    ax.set_axis_off()
+
+def plotFigure(name, m, ax):
+    ax.set_title('%s - generated at %s' %
+                        (name, datetime.now().strftime('%Y%m%d-%H%M')))
+    colNdx = 0
+
+    hs = sorted(m.keys())
+    for h in hs:
+        ds = m[h]
+        sds = dict(sorted(ds.items()))
+
+        v = list(sds.values())
+        dvl = [0] + [v[i+1] - v[i] for i in range(len(v)-1)]
+        kl = list(sds.keys())
+        # print( 'plotting %s: %s' %(name, dvl))
+        ax.tick_params(axis='x', rotation=45)
+        ax.plot(kl, dvl, 'o-', label=h, color=colors[colNdx % 50])
+        # ax.text(kl[-1], dvl[-1], h[len(h)-2:], bbox=dict(boxstyle="square,pad=0.3", fc="lightblue"))
+        colNdx += 1
+
+
 def plotCounter(counterMaps, counter, outdir):
     cm = counterMaps[counter]
     v6Counter = mapV6[counter]
     cm6 = counterMaps[v6Counter]
 
+
+    tsm = None
+    tsm6 = None
+    if counter in mapRatioStats:
+        tsm = counterMaps[mapRatioStats[counter]]
+    if v6Counter in mapRatioStats:
+        tsm6 = counterMaps[mapRatioStats[v6Counter]]
+
+
     fig = plt.figure()
     fig.set_size_inches(20, 10)
-    # fig.tight_layout(pad=20, h_pad=20)
 
-    gs = GridSpec(2, 2, width_ratios=[3, 1], height_ratios=[1, 1], left=0.05, right=0.95, wspace=0.25, hspace=0.35)
+    gs = GridSpec(2, 2, width_ratios=[5, 2], height_ratios=[1, 1], left=0.05, right=0.95, wspace=0.25, hspace=0.25)
     ipv4Ax = fig.add_subplot(gs[0])
     statAx = fig.add_subplot(gs[1:])
     ipv6Ax = fig.add_subplot(gs[2])
 
-    def plotStats(name, m4, m6, ax):
-        nrows = len(m4.keys())
-
-
-        ax.set_xlim(0, 7)
-        ax.set_ylim(0, nrows + 1)
-
-        positions = [0.25, 2, 4, 6, 6.5]
-        columns = ['-0-', 'Host', 'IPv4', 'IPv6']
-
-
-        colNdx = 0
-
-        hs = sorted(m4.keys())
-        for h in hs:
-            ds4 = m4[h]
-            sds = dict(sorted(ds4.items()))
-
-            ds6 = m6[h]
-            sds6 = dict(sorted(ds6.items()))
-
-            v = list(sds.values())
-            v6 = list(sds6.values())
-
-            d4 = v[len(v)-1] - v[len(v)-2]
-            d6 = v6[len(v6)-1] - v6[len(v6)-2]
-
-            # plot shape
-            # -- Transformation functions
-            DC_to_FC = ax.transData.transform
-            FC_to_NFC = fig.transFigure.inverted().transform
-            # -- Take data coordinates and transform them to normalized figure coordinates
-            DC_to_NFC = lambda x: FC_to_NFC(DC_to_FC(x))
-            # -- Add figure axes
-            ax_point_1 = DC_to_NFC([2.25, 0.25])
-            ax_point_2 = DC_to_NFC([2.75, 0.75])
-            ax_width = abs(ax_point_1[0] - ax_point_2[0])
-            ax_height = abs(ax_point_1[1] - ax_point_2[1])
-            ax_coords = DC_to_NFC([0, nrows - colNdx - .75])
-            plot_ax = fig.add_axes(
-                [ax_coords[0], ax_coords[1], ax_width, ax_height]
-            )
-            plot_ax.plot([1],[1],'o-', color=colors[colNdx % 50])
-            plot_ax.set_axis_off()
-
-
-            ax.annotate(xy=(positions[1], nrows - colNdx - 0.5), s=h, ha='center', va='center')
-            ax.annotate(xy=(positions[2], nrows - colNdx - 0.5), s=str(d4), ha='center', va='center')
-            ax.annotate(xy=(positions[3], nrows - colNdx - 0.5), s=str(d6), ha='center', va='center')
-
-            colNdx += 1
-
-        # -- Add column names
-        for index, c in enumerate(columns):
-                if index == 0:
-                    ha = 'left'
-                else:
-                    ha = 'center'
-                ax.annotate(
-                    xy=(positions[index], nrows + .25),
-                    s=columns[index],
-                    ha=ha,
-                    va='bottom',
-                    weight='bold'
-                )
-
-        # Add dividing lines
-        ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [nrows, nrows], lw=1.5, color='black', marker='', zorder=4)
-        ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [0, 0], lw=1.5, color='black', marker='', zorder=4)
-        for x in range(1, nrows):
-            ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [x, x], lw=1.15, color='gray', ls=':', zorder=3 , marker='')
-
-        ax.set_axis_off()
-        
-
-    def plotFigure(name, m, ax):
-        ax.set_title('%s - generated at %s' %
-                            (name, datetime.now().strftime('%Y%m%d-%H%M')))
-        colNdx = 0
-
-        hs = sorted(m.keys())
-        for h in hs:
-            ds = m[h]
-            sds = dict(sorted(ds.items()))
-
-            v = list(sds.values())
-            dvl = [0] + [v[i+1] - v[i] for i in range(len(v)-1)]
-            kl = list(sds.keys())
-            # print( 'plotting %s: %s' %(name, dvl))
-            ax.tick_params(axis='x', rotation=45)
-            ax.plot(kl, dvl, 'o-', label=h, color=colors[colNdx % 50])
-            # ax.text(kl[-1], dvl[-1], h[len(h)-2:], bbox=dict(boxstyle="square,pad=0.3", fc="lightblue"))
-            colNdx += 1
-
 
     plotFigure(counter, cm, ipv4Ax)
     plotFigure(v6Counter, cm6, ipv6Ax)
-    plotStats(v6Counter, cm, cm6, statAx)
+    plotStats(v6Counter, cm, cm6, tsm, tsm6, fig, statAx)
 
     fn = os.path.join(outdir, counter + '-' +
                       datetime.now().strftime('%Y%m%d') + '.png')
