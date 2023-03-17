@@ -53,6 +53,11 @@ mapRatioStats = {
     'sysIpStatNbrUnreachableDropped': 'sysIpStatRx',
 }
 
+mapInterfaceStatsBinding = {
+    '1.2': '1.3',
+    '1.4': '1.5',
+}
+
 EXPECTED_STAT_CNT = 52
 
 
@@ -102,14 +107,22 @@ def parseArgs():
     return parser.parse_args()
 
 
-def setCounter(counterMaps, c, h, d, s):
+def setCounter(counterMaps, c, h, d, s, acc=False):
     if c not in counterMaps:
         counterMaps[c] = {}
     cm = counterMaps[c]
     if not h in cm:
         cm[h] = {}
     hm = cm[h]
-    hm[d] = s
+    if not d in hm:
+        hm[d] = 0    
+
+    v = 0
+    if acc:
+        v = hm[d]
+    
+    hm[d] = s + v
+        
 
 
 def buildState(stateFile):
@@ -171,23 +184,108 @@ def processSnapshot(counterMaps, snapshotFile):
             #         device = h.group('device')
             #         continue
 
-            m = re.match(
-                '^.*::(?P<counter>[^.]+)\.0 = .*: (?P<sample>[0-9]+)$', l)
-            if not m:
-                continue
-
-            # if not device:
-            #     errExit('stat line encountered but hostname is not present in file %s' %snapshotFile)
-
-            statCnt += 1
-            setCounter(counterMaps, m.group('counter'),
-                       device, date, int(m.group('sample')))
+            m = re.match( '^.*::(?P<counter>[^.]+)\.0 = .*: (?P<sample>[0-9]+)$', l)
+            mif = re.match( '^if_rx_tx (?P<if>[0-9]+\.[0-9]+) +(?P<rx_pkts>[0-9]+) +(?P<rx_drops>[0-9]+) +(?P<tx_pkts>[0-9]+) +(?P<tx_drops>[0-9]+)$', l)
+            miqrx = re.match( '^iq_rx (?P<if>[0-9]+\.[0-9]+) +([0-9]+ +){5}(?P<drops>[0-9]+)$', l)
+            miqtx = re.match( '^iq_tx (?P<if>[0-9]+\.[0-9]+) +([0-9]+ +){5}(?P<drops>[0-9]+)$', l)
+            if m:
+                statCnt += 1
+                setCounter(counterMaps, m.group('counter'), device, date, int(m.group('sample')))
+            if mif:
+                setCounter(counterMaps, mif.group('if') + '-if_rx_drops', device, date, int(mif.group('rx_drops')), True)
+                setCounter(counterMaps, mif.group('if') + '-if_tx_drops', device, date, int(mif.group('tx_drops')), True)
+                setCounter(counterMaps, mif.group('if') + '-rx_pkts', device, date, int(mif.group('rx_pkts')), True)
+                setCounter(counterMaps, mif.group('if') + '-tx_pkts', device, date, int(mif.group('tx_pkts')), True)
+            if miqrx:
+                setCounter(counterMaps, miqrx.group('if') + '-rx_drops', device, date, int(miqrx.group('drops')), True)
+            if miqtx:
+                setCounter(counterMaps, miqtx.group('if') + '-tx_drops', device, date, int(miqtx.group('drops')), True)
 
         if statCnt < EXPECTED_STAT_CNT:
             errExit('too few counters when processing file %s' % snapshotFile)
 
 
-def plotStats(name, m4, m6, tm, tm6, fig, ax):
+def getDiffFromMap(m, h):
+    ds = m[h]
+    sds = dict(sorted(ds.items()))
+
+    v = list(sds.values())
+
+    return v[len(v)-1] - v[len(v)-2]
+
+
+
+
+def plotInterfaceStatsTable(fig, ax, ueRx, ueRxPkt, ueTx, ueTxPkt, intRx, intRxPkt, intTx, intTxPkt ):
+    nrows = len(ueRx.keys())
+
+    ax.set_xlim(0, 11)
+    ax.set_ylim(0, nrows + 1)
+
+    positions = [0, 1, 3, 5, 7, 9, 11]
+    columns = ['-0-', 'Host', 'UE Rx', 'UE Tx ','Int Rx', 'Int Tx']
+
+    colNdx = 0
+
+    hs = sorted(ueRx.keys())
+    for h in hs:
+        ueRxDiff = getDiffFromMap(ueRx, h)
+        ueTxDiff = getDiffFromMap(ueTx, h)
+        intRxDiff = getDiffFromMap(intRx, h)
+        intTxDiff = getDiffFromMap(intTx, h)
+
+        ueRxPctDiff = getDiffFromMap(ueRxPkt, h)
+        ueTxPctDiff = getDiffFromMap(ueTxPkt, h)
+        intRxPctDiff = getDiffFromMap(intRxPkt, h)
+        intTxPctDiff = getDiffFromMap(intTxPkt, h)
+
+        # plot shape
+        # -- Transformation functions
+        DC_to_FC = ax.transData.transform
+        FC_to_NFC = fig.transFigure.inverted().transform
+        # -- Take data coordinates and transform them to normalized figure coordinates
+        DC_to_NFC = lambda x: FC_to_NFC(DC_to_FC(x))
+        # -- Add figure axes
+        ax_point_1 = DC_to_NFC([2.25, 0.25])
+        ax_point_2 = DC_to_NFC([2.75, 0.75])
+        ax_width = abs(ax_point_1[0] - ax_point_2[0])
+        ax_height = abs(ax_point_1[1] - ax_point_2[1])
+        ax_coords = DC_to_NFC([0, nrows - colNdx - .75])
+        plot_ax = fig.add_axes(
+            [ax_coords[0], ax_coords[1], ax_width, ax_height]
+        )
+        plot_ax.plot([1],[1],'o-', color=colors[colNdx % 50])
+        plot_ax.set_axis_off()
+
+
+        ax.annotate(xy=(positions[1], nrows - colNdx - 0.5), s=h, ha='left', va='center')
+        ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (ueRxDiff, ueRxDiff / ueRxPctDiff * 100) , ha='right', va='center')
+        ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (ueTxDiff, ueTxDiff / ueTxPctDiff * 100), ha='right', va='center')
+        ax.annotate(xy=(positions[5]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (intRxDiff, intRxDiff / intRxPctDiff * 100), ha='right', va='center')
+        ax.annotate(xy=(positions[6]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (intTxDiff, intTxDiff / intTxPctDiff * 100), ha='right', va='center')
+
+
+        colNdx += 1
+
+    # -- Add column names
+    for index, c in enumerate(columns):
+            ax.annotate( xy=(positions[index], nrows + .05), s=columns[index], ha='left', va='bottom', weight='bold' )
+
+    # Add dividing lines
+    ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [nrows, nrows], lw=1.5, color='black', marker='', zorder=4)
+    ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [0, 0], lw=1.5, color='black', marker='', zorder=4)
+    for pos in range (1, len(positions), 2):
+        ax.fill_between( x=[positions[pos],positions[pos+1]], y1=nrows, y2=0, color='lightgrey', alpha=0.5, zorder=-1, ec='None' )            
+    for x in range(1, nrows):
+        ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [x, x], lw=1.15, color='gray', ls=':', zorder=3 , marker='')
+
+    for x in range(0, len(positions)):
+        ax.plot([positions[x],positions[x]], [ax.get_ylim()[0], ax.get_ylim()[1]-1], lw=1.15, color='gray', zorder=3 , marker='')
+    ax.set_axis_off()
+
+
+
+def plotStats(name, m4, m6, tm, tm6, fig, ax,hdrs=None, posns=None):
     nrows = len(m4.keys())
 
     ax.set_xlim(0, 7.5)
@@ -196,23 +294,21 @@ def plotStats(name, m4, m6, tm, tm6, fig, ax):
     positions = [0, 1, 3.5, 5.5, 7.5]
     columns = ['-0-', 'Host', 'IPv4', 'IPv6']
 
+    if hdrs:
+        columns = hdrs
+
     # check if totals map is provided. Note assuming that if v4 is present, so will v6...
     if tm:
         ax.set_xlim(0, 10.5)
         positions = [0, 1, 4.5, 6.5, 7.5, 9.5, 10.5]
         columns = ['-0-', 'Host', 'IPv4', '%', 'IPv6', '%']
 
+        # assume that if headers provided it has the right number of entries 
+        if hdrs:
+            columns = hdrs
+            positions = posns
+
     colNdx = 0
-
-    def getDiffFromMap(m, h):
-        ds = m[h]
-        sds = dict(sorted(ds.items()))
-
-        v = list(sds.values())
-
-        return v[len(v)-1] - v[len(v)-2]
-
-
 
     hs = sorted(m4.keys())
     for h in hs:
@@ -249,11 +345,13 @@ def plotStats(name, m4, m6, tm, tm6, fig, ax):
             ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s=str(d4), ha='right', va='center')
             ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s=str(d6), ha='right', va='center')
         else:
+            p4 = 0 if td == 0 else (d4 / td)
+            p6 = 0 if td == 0 else (d6 / td6)
             ax.annotate(xy=(positions[1], nrows - colNdx - 0.5), s=h, ha='left', va='center')
             ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s=str(d4), ha='right', va='center')
-            ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s='%2.2f' % (d4 / td), ha='right', va='center')
+            ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s='%2.2f' % p4, ha='right', va='center')
             ax.annotate(xy=(positions[5]- 0.05, nrows - colNdx - 0.5), s=str(d6), ha='right', va='center')
-            ax.annotate(xy=(positions[6]- 0.05, nrows - colNdx - 0.5), s='%2.2f' % (d6 / td6), ha='right', va='center')
+            ax.annotate(xy=(positions[6]- 0.05, nrows - colNdx - 0.5), s='%2.2f' % p6, ha='right', va='center')
 
 
         colNdx += 1
@@ -329,24 +427,64 @@ def plotCounter(counterMaps, counter, outdir):
     plt.close()
 
 
+def plotInterfaceStats(counterMaps, outdir):
+    ue_a = counterMaps['1.2-rx_drops']
+    ue_s = counterMaps['1.3-rx_drops']
+    int_a = counterMaps['1.4-rx_drops']
+    int_s = counterMaps['1.5-rx_drops']
 
-def plotCounters(counterMaps, device):
-    for counter in counterMaps:
-        ds = counterMaps[counter]
-        sds = dict(sorted(ds.items()))
+    ue_t_a = counterMaps['1.2-tx_drops']
+    ue_t_s = counterMaps['1.3-tx_drops']
+    int_t_a = counterMaps['1.4-tx_drops']
+    int_t_s = counterMaps['1.5-tx_drops']
 
-        title = '%s-%s' % (device, counter)
-        import matplotlib.pyplot as plt
+    if_ue_rx_a = counterMaps['1.2-rx_pkts']
+    if_ue_rx_s = counterMaps['1.3-rx_pkts']
+    if_ue_tx_a = counterMaps['1.2-tx_pkts']
+    if_ue_tx_s = counterMaps['1.3-tx_pkts']
+    if_int_rx_a = counterMaps['1.4-rx_pkts']
+    if_int_rx_s = counterMaps['1.5-rx_pkts']
+    if_int_tx_a = counterMaps['1.4-tx_pkts']
+    if_int_tx_s = counterMaps['1.5-tx_pkts']
 
-        v = list(sds.values())
-        dvl = [0] + [v[i+1] - v[i] for i in range(len(v)-1)]
-        kl = list(sds.keys())
-        plt.figure()
-        plt.plot(kl, dvl)
-        plt.title(title)
-        plt.show()
-        plt.savefig(title+'.png')
-        plt.close()
+    ue = {k : {d : ue_a[k][d] + ue_s[k][d] for d in ue_a[k]} for k in ue_a.keys()}
+    ue_t = {k : {d : ue_t_a[k][d] + ue_t_s[k][d] for d in ue_a[k]}  for k in ue_a.keys()}
+    int = {k : {d : int_a[k][d] + int_s[k][d] for d in int_a[k]} for k in ue_a.keys()}
+    int_t = {k: {d : int_t_a[k][d] + int_t_s[k][d] for d in int_a[k]} for k in ue_a.keys()}
+
+    if_ue_rx = {k : {d : if_ue_rx_a[k][d] + if_ue_rx_s[k][d] for d in if_ue_rx_a[k]} for k in if_ue_rx_a.keys()}
+    if_ue_tx = {k : {d : if_ue_tx_a[k][d] + if_ue_tx_s[k][d] for d in if_ue_tx_a[k]} for k in if_ue_tx_a.keys()}
+    if_int_rx = {k : {d : if_int_rx_a[k][d] + if_int_rx_s[k][d] for d in if_int_rx_a[k]} for k in if_int_rx_a.keys()}
+    if_int_tx = {k : {d : if_int_tx_a[k][d] + if_int_tx_s[k][d] for d in if_int_tx_a[k]} for k in if_int_tx_a.keys()}
+
+
+
+    fig = plt.figure()
+    fig.set_size_inches(20, 10)
+
+
+    gs = GridSpec(4, 3, width_ratios=[4, 3, 1], height_ratios=[1, 1, 1, 1], left=0.05, right=0.98, wspace=0.05, hspace=0.15)
+    ueAx = fig.add_subplot(gs[:1, :1])
+    statAx = fig.add_subplot(gs[:, 1:4])
+    ueTxAx = fig.add_subplot(gs[1:2, :1 ])
+    intAx = fig.add_subplot(gs[2:3, :1])
+    intTxAx = fig.add_subplot(gs[3:4, :1])
+
+
+    plotFigure('ue side rx drops', ue, ueAx)
+    plotFigure('internet side rx drops', int, intAx)
+    plotFigure('ue side tx drops', ue_t, ueTxAx)
+    plotFigure('internet side tx drops', int_t, intTxAx)
+
+
+    plotInterfaceStatsTable(fig, statAx, ue, if_ue_rx, ue_t, if_ue_tx, int, if_int_rx, int_t, if_int_tx)
+
+    fn = os.path.join(outdir, 'intf-' + datetime.now().strftime('%Y%m%d') + '.png')
+    print('saving: ' + fn)
+    plt.savefig(fn, dpi=100)
+    plt.show()
+    plt.close()
+
 
 
 def saveStateFile(stateFile, counterMaps):
@@ -391,7 +529,8 @@ def run():
     #         errExit('snapshot file does not have the right name format: %s' % fn)
 
     # build state
-    counterMaps = buildState(stateFile)
+    counterMaps = {}
+    #buildState(stateFile)
 
     # add new samples if present
     for sf in inFiles:  # args.snapshots:
@@ -402,10 +541,13 @@ def run():
     if args.trim:
         trimState(counterMaps, args.trim[0])
 
-    # plot state
+    # plot stats
     defaultMetrics = mapV6.keys()
     for m in (args.metrics or defaultMetrics):
         plotCounter(counterMaps, m, outdir)
+
+    # plot inteface stats
+    plotInterfaceStats(counterMaps, outdir)
 
     # if new sample, save new state with backup
     if inFiles:
