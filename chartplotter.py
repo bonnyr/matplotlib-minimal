@@ -373,8 +373,7 @@ def plotStats(name, m4, m6, tm, tm6, fig, ax,hdrs=None, posns=None):
     ax.set_axis_off()
 
 def plotFigure(name, m, ax):
-    ax.set_title('%s - generated at %s' %
-                        (name, datetime.now().strftime('%Y%m%d-%H%M')))
+    ax.set_title('%s - generated at %s' % (name, datetime.now().strftime('%Y%m%d-%H%M')))
     colNdx = 0
 
     hs = sorted(m.keys())
@@ -383,7 +382,7 @@ def plotFigure(name, m, ax):
         sds = dict(sorted(ds.items()))
 
         v = list(sds.values())
-        dvl = [0] + [v[i+1] - v[i] for i in range(len(v)-1)]
+        dvl = [0] + [max(0, v[i+1] - v[i]) for i in range(len(v)-1)]
         kl = list(sds.keys())
         # print( 'plotting %s: %s' %(name, dvl))
         ax.tick_params(axis='x', rotation=45)
