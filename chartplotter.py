@@ -259,10 +259,10 @@ def plotInterfaceStatsTable(fig, ax, ueRx, ueRxPkt, ueTx, ueTxPkt, intRx, intRxP
 
 
         ax.annotate(xy=(positions[1], nrows - colNdx - 0.5), s=h, ha='left', va='center')
-        ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (ueRxDiff, ueRxDiff / ueRxPctDiff * 100) , ha='right', va='center')
-        ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (ueTxDiff, ueTxDiff / ueTxPctDiff * 100), ha='right', va='center')
-        ax.annotate(xy=(positions[5]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (intRxDiff, intRxDiff / intRxPctDiff * 100), ha='right', va='center')
-        ax.annotate(xy=(positions[6]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (intTxDiff, intTxDiff / intTxPctDiff * 100), ha='right', va='center')
+        ax.annotate(xy=(positions[3]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (ueRxDiff, 0 if ueRxPctDiff == 0 else ueRxDiff / ueRxPctDiff * 100) , ha='right', va='center')
+        ax.annotate(xy=(positions[4]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (ueTxDiff, 0 if ueTxPctDiff == 0 else ueTxDiff / ueTxPctDiff * 100), ha='right', va='center')
+        ax.annotate(xy=(positions[5]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (intRxDiff, 0 if intRxPctDiff == 0 else intRxDiff / intRxPctDiff * 100), ha='right', va='center')
+        ax.annotate(xy=(positions[6]- 0.05, nrows - colNdx - 0.5), s='%d (%2.6f%%)' % (intTxDiff, 0 if intTxPctDiff == 0 else intTxDiff / intTxPctDiff * 100), ha='right', va='center')
 
 
         colNdx += 1
